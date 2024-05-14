@@ -1,86 +1,87 @@
-import { type ExecaChildPromise, execaCommand, type ExecaReturnValue } from 'execa';
-import { globby } from 'globby';
-import json5 from 'json5';
-import { Listr } from 'listr2';
-import type { ChildProcess } from 'node:child_process';
-import fs from 'node:fs';
+import chalk from 'chalk';
+import { execaCommand } from 'execa';
+import { cosmiconfig, type CosmiconfigResult } from 'cosmiconfig';
+import { TypeScriptLoader } from 'cosmiconfig-typescript-loader';
+import enquirer from 'enquirer';
+import { readFileSync } from 'node:fs';
 import path from 'node:path';
-import { parse as parseYaml } from 'yaml';
-import { getRootDirectoryPath } from '../helpers/root-directory-path.js';
-import { ConfigurationModel, type ConfigurationModelSchema } from '../models/configuration-model.js';
+import { sprintf } from 'sprintf-js';
+import type { Primitive } from 'zod';
+import { Logger } from '../helpers/logger.js';
+import type { AutomatonConfigModel } from '../models/automaton.js';
+import { ConfigurationNotFoundError } from '../models/errors.js';
 
-const parseJSON = json5.parse;
+const { prompt } = enquirer;
 
 export class CommandRunner {
-  public async run(config: string): Promise<void> {
-    const data = await this.validateData(config);
+  public async run(jobName: string | undefined, answerFile: string | undefined): Promise<void> {
+    const result = await this.getConfig();
 
-    const tasks = new Listr<unknown>([], {
-      concurrent: data.type === 'parallel',
-      collectErrors: 'full',
-      exitOnError: data.type === 'series',
-    });
-
-    for (const action of data.actions) {
-      tasks.add([
-        {
-          title: action.label,
-          task: async (): Promise<ChildProcess & ExecaChildPromise<string> & Promise<ExecaReturnValue<string>>> => {
-            return execaCommand(action.command, { cwd: path.resolve(getRootDirectoryPath(), '..') });
-          },
-        },
-      ]);
+    if (result === null) {
+      throw new ConfigurationNotFoundError('Configuration file not found');
     }
 
-    try {
-      await tasks.run();
-    } catch (error: unknown) {
-      if (error instanceof Error) {
-        throw new TypeError(`There was an issue trying to parse the configuration file: ${error.message}`);
+    const config = await this.parseConfig(result.config);
+
+    const job = config.jobs.find((index) => index.id === jobName);
+
+    if (!job) {
+      throw new Error(`Job <${jobName}> not found.`);
+    }
+
+    Logger.println(`Executing Job : ${chalk.cyanBright(job.name)}`);
+
+    let answers: Record<string, Primitive> = {};
+    if (answerFile) {
+      answers = JSON.parse(readFileSync(path.resolve(answerFile.toString()), { encoding: 'utf8' }));
+    }
+
+    if (job.prompts) {
+      for (const question of job.prompts) {
+        const response = await prompt(question);
+        answers = { ...answers, ...response };
       }
     }
-  }
 
-  private async getConfigFile(config: string = 'default'): Promise<string> {
-    const _configPath = path.resolve(`${getRootDirectoryPath()}/`);
-
-    const configFiles = await globby(`${config}.*`, { dot: true, cwd: _configPath, absolute: true });
-    if (configFiles.length !== 1) {
-      throw new Error(`There was an issue trying to find the configuration file for ${config}`);
-    }
-
-    return configFiles.pop() ?? '';
-  }
-
-  private readConfigFile(configFile: string): string {
-    try {
-      return fs.readFileSync(configFile, { encoding: 'utf8' });
-    } catch (error: unknown) {
-      if (error instanceof Error) {
-        throw new TypeError(`There was an issue trying to parse the configuration file: ${error.message}`);
+    for await (const action of job.actions) {
+      if (action.when && !(await action.when(answers))) {
+        continue;
       }
-      return '';
+
+      switch (action.type) {
+        case 'cmd': {
+          const command = sprintf(action.cmd, answers);
+          Logger.info(`Executing command : ${chalk.cyanBright(command)}`);
+          // await execaCommand(command);
+          break;
+        }
+        case 'run': {
+          Logger.info(`Executing custom function`);
+          await action.run(answers);
+          break;
+        }
+      }
     }
+
+    Logger.success('Job executed successfully');
   }
 
-  private parseConfigData(configFile: string, data: string): unknown {
-    const { ext } = path.parse(configFile);
-
-    if (ext === '.yaml' || ext === '.yml') {
-      return parseYaml(data);
-    } else if (ext === '.json' || ext === '.json5') {
-      return parseJSON(data);
-    } else {
-      throw new Error(`Unsupported file type: ${ext}`);
+  private async parseConfig(config: unknown): Promise<AutomatonConfigModel> {
+    if (typeof config === 'function') {
+      return config();
     }
+
+    return config as AutomatonConfigModel;
   }
 
-  private async validateData(config: string): Promise<ConfigurationModelSchema> {
-    const configFile = await this.getConfigFile(config);
-
-    const dataString = this.readConfigFile(configFile);
-    const data = this.parseConfigData(configFile, dataString);
-
-    return ConfigurationModel.parse(data);
+  private async getConfig(): Promise<CosmiconfigResult> {
+    return cosmiconfig('automaton', {
+      loaders: {
+        '.ts': TypeScriptLoader(),
+        '.cts': TypeScriptLoader(),
+        '.mts': TypeScriptLoader(),
+      },
+      searchPlaces: [`automaton.config.js`, `automaton.config.ts`, `automaton.config.mjs`, `automaton.config.cjs`, `automaton.config.mts`, `automaton.config.cts`],
+    }).search(process.cwd());
   }
 }
