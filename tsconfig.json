@@ -2,7 +2,7 @@
   "compilerOptions": {
     "declaration": true,
     "outDir": "dist",
-    "rootDir": "src",
+    "rootDir": ".",
     "moduleResolution": "NodeNext",
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true,
@@ -22,7 +22,8 @@
     "lib": ["ES2022"],
     "types": ["node"]
   },
-  "include": ["./src/**/*"],
+  "include": ["./src/**/*", "./tests/**/*"],
+  "exclude": ["node_modules", "dist"],
   "ts-node": {
     "esm": true
   }
