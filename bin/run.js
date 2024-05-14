@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { readPackageSync } from 'read-pkg';
 import { default as updateNotifier } from 'update-notifier';
-import { run } from '../dist/index.js';
+import { run } from '../dist/entry.js';
 
 const packageJSON = await readPackageSync();
 
