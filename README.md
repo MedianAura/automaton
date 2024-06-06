@@ -6,9 +6,7 @@ Create an automaton.config at the root of your project and add jobs and actions 
 [![Downloads/week](https://img.shields.io/npm/dw/@medianaura/automaton.svg)](https://npmjs.org/package/@medianaura/automaton)
 [![Commitizen friendly](https://img.shields.io/badge/commitizen-friendly-brightgreen.svg)](http://commitizen.github.io/cz-cli/)
 
-
 - [Usage](#usage)
-
 
 # Usage
 
@@ -25,14 +23,15 @@ export default () => {
       {
         id: 'version',
         name: 'Create a new version',
-        actions: [{
-          type: 'run',
-          run: (answers) => {
-            if (!answers.confirm) {
-              process.exit(4);
-            }
+        actions: [
+          {
+            type: 'run',
+            run: (answers) => {
+              if (!answers.confirm) {
+                process.exit(4);
+              }
+            },
           },
-        },
           {
             type: 'cmd',
             cmd: 'automaton package',
@@ -68,10 +67,9 @@ export default () => {
           {
             type: 'cmd',
             cmd: 'npm publish',
-          }],
-        prompts: [
-          ...getVersionPrompt(),
+          },
         ],
+        prompts: [...getVersionPrompt()],
       },
     ],
   });

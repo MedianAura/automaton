@@ -6,21 +6,18 @@ export default () => {
       {
         id: 'version',
         name: 'Create a new version',
-        actions: [{
-          type: 'run',
-          run: (answers) => {
-            if (!answers.confirm) {
-              process.exit(4);
-            }
+        actions: [
+          {
+            type: 'run',
+            run: (answers) => {
+              if (!answers.confirm) {
+                process.exit(4);
+              }
+            },
           },
-        },
           {
             type: 'cmd',
             cmd: 'automaton package',
-          },
-          {
-            type: 'cmd',
-            cmd: 'vc generate --no-commit --next %(version)s',
           },
           {
             type: 'cmd',
@@ -32,7 +29,7 @@ export default () => {
           },
           {
             type: 'cmd',
-            cmd: 'git commit -m "doc: mise à jour du changelog pour la version %(version)s"',
+            cmd: 'git commit -m "doc: mise à jour pour la version %(version)s"',
           },
           {
             type: 'cmd',
@@ -49,10 +46,9 @@ export default () => {
           {
             type: 'cmd',
             cmd: 'npm publish',
-          }],
-        prompts: [
-          ...getVersionPrompt(),
+          },
         ],
+        prompts: [getVersionPrompt],
       },
     ],
   });

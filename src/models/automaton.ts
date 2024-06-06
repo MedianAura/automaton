@@ -1,7 +1,11 @@
-import type { prompt } from 'enquirer';
+import type Enquirer from 'enquirer';
 import type { Primitive } from 'zod';
 
-export type AutomatonPromptType = Parameters<typeof prompt>[0];
+export type EnquirerInstance = Enquirer;
+
+export type AutomatonPromptResult = Promise<Record<string, Primitive> | undefined>;
+
+export type AutomatonPromptFunction = (prompt: EnquirerInstance) => AutomatonPromptResult;
 
 export type ActionsTypes = 'cmd' | 'run';
 
@@ -26,7 +30,7 @@ export type JobModel = {
   id: string;
   name: string;
   actions: ActionsModel[];
-  prompts?: AutomatonPromptType[];
+  prompts?: AutomatonPromptFunction[];
 };
 
 export type AutomatonConfigModel = {

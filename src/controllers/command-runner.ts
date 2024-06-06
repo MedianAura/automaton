@@ -1,17 +1,15 @@
 import chalk from 'chalk';
-import { execaCommand } from 'execa';
 import { cosmiconfig, type CosmiconfigResult } from 'cosmiconfig';
 import { TypeScriptLoader } from 'cosmiconfig-typescript-loader';
-import enquirer from 'enquirer';
+import Enquirer from 'enquirer';
+import { execaCommand } from 'execa';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { sprintf } from 'sprintf-js';
 import type { Primitive } from 'zod';
 import { Logger } from '../helpers/logger.js';
-import type { AutomatonConfigModel } from '../models/automaton.js';
+import type { AutomatonConfigModel, AutomatonPromptFunction, AutomatonPromptResult } from '../models/automaton.js';
 import { ConfigurationNotFoundError } from '../models/errors.js';
-
-const { prompt } = enquirer;
 
 export class CommandRunner {
   public async run(jobName: string | undefined, answerFile: string | undefined): Promise<void> {
@@ -38,8 +36,10 @@ export class CommandRunner {
 
     if (job.prompts) {
       for (const question of job.prompts) {
-        const response = await prompt(question);
-        answers = { ...answers, ...response };
+        const response = await this.getPrompt(question);
+        if (response) {
+          answers = { ...answers, ...response };
+        }
       }
     }
 
@@ -52,7 +52,7 @@ export class CommandRunner {
         case 'cmd': {
           const command = sprintf(action.cmd, answers);
           Logger.info(`Executing command : ${chalk.cyanBright(command)}`);
-          // await execaCommand(command);
+          await execaCommand(command, { stdio: 'inherit', windowsVerbatimArguments: true });
           break;
         }
         case 'run': {
@@ -83,5 +83,9 @@ export class CommandRunner {
       },
       searchPlaces: [`automaton.config.js`, `automaton.config.ts`, `automaton.config.mjs`, `automaton.config.cjs`, `automaton.config.mts`, `automaton.config.cts`],
     }).search(process.cwd());
+  }
+
+  private async getPrompt(config: AutomatonPromptFunction): AutomatonPromptResult {
+    return config(new Enquirer());
   }
 }
