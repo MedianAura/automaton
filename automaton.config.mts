@@ -45,10 +45,20 @@ export default () => {
           },
           {
             type: 'cmd',
-            cmd: 'npm publish',
+            cmd: 'npm publish --access public',
           },
         ],
         prompts: [getVersionPrompt],
+      },
+      {
+        id: 'package',
+        name: 'Create a new version',
+        actions: [
+          {
+            type: 'cmd',
+            cmd: 'npm run build',
+          },
+        ],
       },
     ],
   });
